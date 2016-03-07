@@ -1,6 +1,6 @@
 var app = require('express')();
 var server = require('http').Server(app);
-var io = require('socket.io')(server);
+var io = require('socket.io',{ rememberTransport: false, transports: ['WebSocket', 'Flash Socket', 'AJAX long-polling']})(server);
 
 var port = process.env.PORT || 3000;
 server.listen(port);
@@ -18,8 +18,13 @@ app.get('/paperjs.js', function (req, res) {
 });
 
 io.on('connection', function (socket) {
-  socket.on('control-draw-rectangle', function (data) {
-    socket.broadcast.emit('view-draw-rectangle', data);
-  });
+  // socket.on('control-draw-rectangle', function (data) {
+  // 	console.log("going to broadcast");
+  //   socket.broadcast.emit('view-draw-rectangle', data);
+  // });
+	socket.on('control-update', function (data) {
+  		console.log("going to broadcast");
+    	socket.broadcast.emit('view-update', data);
+  	});
 
 });
