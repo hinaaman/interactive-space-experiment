@@ -5,6 +5,16 @@ var io = require('socket.io',{ rememberTransport: false, transports: ['WebSocket
 var port = process.env.PORT || 3000;
 server.listen(port);
 
+var MongoClient = require('mongodb').MongoClient;
+var assert = require('assert');
+var ObjectId = require('mongodb').ObjectID;
+var url = 'mongodb://localhost:27017';
+MongoClient.connect(url, function(err, db) {
+  assert.equal(null, err);
+  console.log("Connected correctly to server.");
+  db.close();
+});
+
 app.get('/', function (req, res) {
   res.sendfile(__dirname + '/www/space-view.html');
 });
