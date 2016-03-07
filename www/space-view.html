@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<script src="/socket.io/socket.io.js"></script>
+    <script type="text/javascript" src="paperjs.js"></script>
+    <script type="text/paperscript" canvas="myCanvas">
+	    var socket = io.connect('http://localhost:3000');
+	    socket.on('view-draw-rectangle', function (data) {
+	    	var size = data.size;
+			var RectangleData = data.RectangleData;
+			var room = new Path.Rectangle (new Rectangle(RectangleData));
+			room.style = data.style;
+	  	});
+    </script>
+</script>
+</head>
+
+<body>
+	<style type="text/css">
+	html,
+	body {
+    	margin: 0;
+    	overflow: hidden;
+    	height: 100%;
+	}
+
+	/* Scale canvas with resize attribute to full size */
+	canvas[resize] {
+    	width: 100%;
+    	height: 100%;
+    	background: black;
+	}
+	</style>
+
+	<canvas id="myCanvas" resize="true"></canvas>
+</body>
+</html>

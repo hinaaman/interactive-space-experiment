@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<script src="/socket.io/socket.io.js"></script>
+    <script type="text/javascript" src="paperjs.js"></script>
+    <script type="text/paperscript" canvas="myCanvas">
+    	var socket = io.connect('http://localhost:3000');
+
+		// define the initial style of the rooms to be created
+		var wallStyle = {
+			strokeColor: '#FFFF99',
+			fillColor: {hue: 1,	saturation: 1, brightness: 0},
+			strokeWidth: 8,
+			shadowColor: new Color(1, 1, 0.2),
+	    	shadowBlur: 16
+		};
+		// define the initial style of the spotlights to be created
+		var lightStyle = {
+			strokeColor: 'white',
+			fillColor: 'white',
+			strokeWidth: 1,
+			shadowColor: 'white',
+	    	shadowBlur: 50
+		};
+		// define the initial style of the warning spots
+		var textWarningStyle = {
+    		fontFamily: 'Courier New',
+    		fontWeight: 'bold',
+    		fontSize: 14,
+    		justification: 'left'
+		};
+		// define the options to be passed on to the hitTest function
+		var hitOptions = {
+			segments: true,
+			stroke: true,
+			fill: true,
+			tolerance: 5
+		};
+		// initiate variables to be used accross functions and function calls
+		var segment, path;
+		var movePath = false;
+		var obj;
+		var edge1;
+		var edge2;
+		var pocketContent = [0,0];
+		// function to remember the last two items clicked, saving them in "pocketContent"
+		function pocket (lastClicked){
+			pocketContent.pop();
+			pocketContent.unshift(lastClicked);
+			return;
+		}
+
+		// when mouse is clicked
+		function onMouseDown(event) {
+			//socket.emit('control-update', event);
+			// re-starts all variables at null very time mouse is clicked, unless later condition is met
+			segment = path = obj = edge1 = edge2 = null;
+			var hitResult = project.hitTest(event.point, hitOptions);
+			// creates a new room with shift + click
+			if (event.modifiers.shift) {
+				var size = 100;
+				var RectangleData = {x: event.point.x - size/2, y: event.point.y - size/2, width: size, height: size};
+				var room = new Path.Rectangle (new Rectangle(RectangleData));
+				room.style = wallStyle;
+				socket.emit("control-draw-rectangle", {size: size, RectangleData: RectangleData, style: wallStyle });
+				return;
+			}
+			// creates new light spot with control + click
+			else	if (event.modifiers.control) {
+				var size = 25;
+				var spotlight = new Path.Circle(event.point, size);
+				spotlight.style = lightStyle;
+				return;
+			}
+			// creates new warning with alt + click
+			else	if (event.modifiers.space) {
+				var size = 18;
+				var warning = new Path.Circle(event.point, size);
+				var textWarning = new PointText((event.point.x + size*1.5), (event.point.y + size*1.5));
+				textWarning.style = textWarningStyle;
+				// prompt controller for warning message. first later (r or g) defines type/color of warning.
+				var textInput = prompt("Enter warning message. \'r\' for red and \'g\' for green");
+				// keep type/color of warning
+				var inputType = textInput[0];
+				// remove type/color of warning from message to be displayed
+				textWarning.content = textInput.slice(2);
+				// change color of text and circle depending on type entered by controller.
+				if (inputType == 'r') {
+					warning.style = {
+						fillColor: '#e60000',
+						strokeColor: '#4d0000',
+						strokeWidth: size/2
+					};
+					warning.opacity = 0.5;
+					textWarning.fillColor = 'red';
+				}
+				else if (inputType == 'g') {
+					warning.style = {
+						fillColor: '#33cc33',
+						strokeColor: '#145214',
+						strokeWidth: size/2
+					};
+					warning.opacity = 0.5;
+					textWarning.fillColor = 'green';
+				}
+			}
+			// return when click on empty space
+			else 	if (!hitResult) {
+				return;
+			}	
+			// defines different behaviors when item is clicked, depending on where it's clicked
+			else if (hitResult) {
+				// remembers the item clicked
+				path = hitResult.item;
+				// puts item clicked in "pocked" to me remembered later on (last two)
+				pocket (hitResult.item);
+				// remember the two end segments of an edge (index i and i+1) when edge is clicked
+				if (hitResult.type == 'stroke') {
+					var location = hitResult.location;
+					// ensure that after last segment, index restarts at 0
+					if (path.segments[location.index] != path.lastSegment){
+						edge1 = path.segments[location.index];
+						edge2 = path.segments[location.index +1];
+					}
+					if (path.segments[location.index] == path.lastSegment){
+						edge1 = path.segments[location.index];
+						edge2 = path.segments[0];
+					}
+				}
+				// remember the item clicked when "inside" room in clicked
+				else if (hitResult.type == 'fill') {
+					obj = hitResult.item;
+				}	
+			}
+		};
+
+		// when mouse is dragged after clicking
+		function onMouseDrag(event) {
+			// if click happened inside room, move room
+			if (obj) {
+				obj.position += event.delta;
+				}
+			// if click happened on edge, move edge
+			else if (edge1) {
+				// if edge is horizontal, move only along y axis 
+				if (edge2.point.y > (edge1.point.y - 5) && edge2.point.y < (edge1.point.y + 5) ) {
+					edge1.point += new Point(0,event.delta.y);
+					edge2.point += new Point(0,event.delta.y);
+				}
+				// if edge is vertical, move only along x axis
+				else if (edge2.point.x > (edge1.point.x - 5) && edge2.point.x < (edge1.point.x + 5) ) {
+					edge1.point += new Point(event.delta.x, 0);
+					edge2.point += new Point(event.delta.x, 0);
+				}
+			}
+		}
+		// when different keyboard keys are pressed
+		function onKeyDown(event) {
+			// unite two last item clicked (saved in "pocket")
+			if(event.key == 'u') {
+				var rec1 = pocketContent[0];
+				var rec2 = pocketContent[1];
+				var newRoom = rec1.unite(rec2);
+				rec1.remove();
+				rec2.remove();
+			}
+			// change color and brightness of last item clicked
+			if(event.key == 'up') {
+				var rectangleToColor = pocketContent[0];
+				rectangleToColor.fillColor.hue += 1.8;
+				rectangleToColor.fillColor.brightness += 0.0025;
+				rectangleToColor.fillColor.saturation -= 0.0025;
+			}
+			if(event.key == 'down') {
+				var rectangleToColor = pocketContent[0];
+				rectangleToColor.fillColor.hue -= 1.8;
+				rectangleToColor.fillColor.brightness -= 0.0025;
+				rectangleToColor.fillColor.saturation += 0.0025;
+			}
+			// delete last item clicked
+			if(event.key == 'delete') {
+				var itemToDelete = pocketContent[0];
+				itemToDelete.remove();
+			}	
+		}
+</script>
+</head>
+
+<body>
+	<style type="text/css">
+	html,
+	body {
+    	margin: 0;
+    	overflow: hidden;
+    	height: 100%;
+	}
+
+	/* Scale canvas with resize attribute to full size */
+	canvas[resize] {
+    	width: 100%;
+    	height: 100%;
+    	background: black;
+	}
+	</style>
+
+	<canvas id="myCanvas" resize="true"></canvas>
+</body>
+</html>
