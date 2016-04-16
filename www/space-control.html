@@ -23,10 +23,11 @@
 	<canvas id="myCanvas" resize="true" data-paper-keepalive="true"></canvas>
 	<script src="/socket.io/socket.io.js"></script>
     <script type="text/javascript" src="paperjs.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.0.0-beta1/jquery.js"></script>
     <script type="text/paperscript" canvas="myCanvas">
 
-    	var socket = io.connect('https://interacting-space.herokuapp.com/');
-    	//var socket = io.connect('http://localhost:3000');
+    	//var socket = io.connect('https://interacting-space.herokuapp.com/');
+    	var socket = io.connect('http://localhost:3000');
 
 		// define the initial style of the rooms to be created
 		var wallStyle = {
@@ -65,12 +66,23 @@
 		var edge1;
 		var edge2;
 		var pocketContent = [0,0];
+		var mousePos = {};
 		// function to remember the last two items clicked, saving them in "pocketContent"
 		function pocket (lastClicked){
 			pocketContent.pop();
 			pocketContent.unshift(lastClicked);
 			return;
 		}
+
+		setInterval(function(){
+			socket.emit("record-view", project.exportJSON());
+		},30000);
+
+		$("body").mousemove(function(e) {
+    		mousePos.x = e.pageX;
+    		mousePos.y = e.pageY;
+		});
+		 
 
 		// when mouse is clicked
 		function onMouseDown(event) {
@@ -207,6 +219,12 @@
 			if(event.key == 'delete') {
 				var itemToDelete = pocketContent[0];
 				itemToDelete.remove();
+			}
+			if(event.key == 'm') {
+				var mouseInput = "Mouse Position: x: " + mousePos.x + " y: " + mousePos.y;
+				var promptInput = prompt(mouseInput + " - Enter note:");
+				var message = mouseInput + " " + promptInput;
+				socket.emit("record-message", message);
 			}
 			socket.emit("control-update", project.exportJSON());	
 		}
